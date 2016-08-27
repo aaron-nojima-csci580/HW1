@@ -4,7 +4,7 @@
 */
 
 // 
-Application.cpp: implementation of the Application class.
+// Application.cpp: implementation of the Application class.
 //
 
 #include "stdafx.h"
