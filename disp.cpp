@@ -11,6 +11,8 @@ int GzNewFrameBuffer(char** framebuffer, int width, int height)
  -- allocate memory for framebuffer : 3 bytes(b, g, r) x width x height
  -- pass back pointer 
  */
+	// Byte = unsigned char (same data size ~ 8 bits)
+	// framebuffer pointer references pointer to allocated memory
 	*framebuffer = (char *)malloc(3 * sizeof(char) * width * height);
 	return GZ_SUCCESS;
 }
@@ -21,9 +23,14 @@ int GzNewDisplay(GzDisplay	**display, int xRes, int yRes)
   -- allocate memory for indicated resolution
   -- pass back pointer to GzDisplay object in display
 */
+	// allocate memory for GzDisplay display
 	*display = (GzDisplay *)malloc(sizeof(GzDisplay));
+	
+	// set resolution fields
 	(*display)->xres = xRes;
 	(*display)->yres = yRes;
+
+	// allocate memory for framebuffer array (note that this is not 2D)
 	(*display)->fbuf = (GzPixel *)malloc(sizeof(GzPixel) * yRes * xRes);
 	return GZ_SUCCESS;
 }
@@ -43,6 +50,7 @@ int GzGetDisplayParams(GzDisplay *display, int *xRes, int *yRes)
 {
 /* HW1.4 pass back values for a display */
 	if (display != NULL) {
+		// load resolution values into input integer pointers
 		*xRes = display->xres;
 		*yRes = display->yres;
 		return GZ_SUCCESS;
@@ -57,12 +65,13 @@ int GzInitDisplay(GzDisplay	*display)
 	if (display != NULL) {
 		for (int i = 0; i < display->xres; ++i) {
 			for (int j = 0; j < display->yres; j++) {
-				GzPixel pixel = display->fbuf[ARRAY(i, j)];
-				display->fbuf[ARRAY(i, j)].red = 2000;
-				display->fbuf[ARRAY(i, j)].green = 2000;
-				display->fbuf[ARRAY(i, j)].blue = 2000;
-				display->fbuf[ARRAY(i, j)].alpha = 4095;
-				display->fbuf[ARRAY(i, j)].z = 4095;
+				GzPixel * pixel = &display->fbuf[ARRAY(i, j)];
+				// arbitrary values chosen (this is going to be the background
+				pixel->red = 2000;
+				pixel->green = 2000;
+				pixel->blue = 2000;
+				pixel->alpha = 4095;
+				pixel->z = 4095;
 			}
 		}
 		return GZ_SUCCESS;
@@ -74,16 +83,20 @@ int GzInitDisplay(GzDisplay	*display)
 int GzPutDisplay(GzDisplay *display, int i, int j, GzIntensity r, GzIntensity g, GzIntensity b, GzIntensity a, GzDepth z)
 {
 /* HW1.6 write pixel values into the display */
+	// clamp rgb values between 0 and 4095
 	r = max(0, min(4095, r));
 	b = max(0, min(4095, b));
 	g = max(0, min(4095, g));
 	if (display != NULL) {
+		// don't bother updating framebuffer if out of bounds
 		if (i >= 0 && i < display->xres && j >= 0 && j < display->yres) {
-			display->fbuf[ARRAY(i, j)].red = r;
-			display->fbuf[ARRAY(i, j)].green = g;
-			display->fbuf[ARRAY(i, j)].blue = b;
-			display->fbuf[ARRAY(i, j)].alpha = a;
-			display->fbuf[ARRAY(i, j)].z = z;
+			// set pixel values
+			GzPixel * pixel = &display->fbuf[ARRAY(i, j)];
+			pixel->red = r;
+			pixel->green = g;
+			pixel->blue = b;
+			pixel->alpha = a;
+			pixel->z = z;
 		}
 		return GZ_SUCCESS;
 	}
@@ -95,12 +108,15 @@ int GzGetDisplay(GzDisplay *display, int i, int j, GzIntensity *r, GzIntensity *
 {
 /* HW1.7 pass back a pixel value to the display */
 	if (display != NULL) {
+		// don't bother for out of bounds values
 		if (i >= 0 && i < display->xres && j >= 0 && j < display->yres) {
-			*r = display->fbuf[ARRAY(i, j)].red;
-			*g = display->fbuf[ARRAY(i, j)].green;
-			*b = display->fbuf[ARRAY(i, j)].blue;
-			*a = display->fbuf[ARRAY(i, j)].alpha;
-			*z = display->fbuf[ARRAY(i, j)].z;
+			// get pixel values
+			GzPixel * pixel = &display->fbuf[ARRAY(i, j)];
+			*r = pixel->red;
+			*g = pixel->green;
+			*b = pixel->blue;
+			*a = pixel->alpha;
+			*z = pixel->z;
 		}
 		return GZ_SUCCESS;
 	}
@@ -115,13 +131,16 @@ int GzFlushDisplay2File(FILE* outfile, GzDisplay *display)
 	if (display != NULL && outfile != NULL) {
 		int xRes = display->xres;
 		int yRes = display->yres;
+		// header file for ppm
 		fprintf(outfile, "P6 %d %d 255\r", xRes, yRes);
 		char r, g, b;
-		for (int y = 0; y < yRes; ++y) {
-			for (int x = 0; x < xRes; ++x) {
-				r = display->fbuf[ARRAY(x, y)].red >> 4;
-				g = display->fbuf[ARRAY(x, y)].green >> 4;
-				b = display->fbuf[ARRAY(x, y)].blue >> 4;
+		for (int j = 0; j < yRes; ++j) {
+			for (int i = 0; i < xRes; ++i) {
+				GzPixel * pixel = &display->fbuf[ARRAY(i, j)];
+				r = pixel->red >> 4;
+				g = pixel->green >> 4;
+				b = pixel->blue >> 4;
+				// Binary ASCII values (aka char values from right-shifted byte value)
 				fprintf(outfile, "%c%c%c", r, g, b);
 			}
 		}
@@ -144,12 +163,17 @@ int GzFlushDisplay2FrameBuffer(char* framebuffer, GzDisplay *display)
 		char r, g, b;
 		for (int i = 0; i < xRes; ++i) {
 			for (int j = 0; j < yRes; ++j) {
-				r = display->fbuf[ARRAY(i, j)].red >> 4;
-				g = display->fbuf[ARRAY(i, j)].green >> 4;
-				b = display->fbuf[ARRAY(i, j)].blue >> 4;
-				framebuffer[3 * ARRAY(i, j) + 0] = b;
-				framebuffer[3 * ARRAY(i, j) + 1] = g;
-				framebuffer[3 * ARRAY(i, j) + 2] = r;
+				int index = ARRAY(i, j);
+				GzPixel * pixel = &display->fbuf[index];
+				r = pixel->red >> 4;
+				g = pixel->green >> 4;
+				b = pixel->blue >> 4;
+				// Binary ASCII values (aka char values from right-shifted byte value)
+				// since there are 3 char values per pixel in the framebuffer
+				// also noting the order of bgr instead
+				framebuffer[3 * index + 0] = b;
+				framebuffer[3 * index + 1] = g;
+				framebuffer[3 * index + 2] = r;
 			}
 		}
 		return GZ_SUCCESS;
